@@ -1,33 +1,40 @@
-# Vibe-Vuln-Bench
+<p align="center">
+  <a href="https://shipmate.agency">
+    <img src="./assets/banner.png" alt="Vibe-Vuln-Bench by Shipmate — Security benchmark for AI app builders" width="840" />
+  </a>
+</p>
 
-Open benchmark prompt and 10-check static security grader for comparing what AI app builders (**Lovable, Bolt, Cursor, v0, Replit**) ship by default when asked to build a real multi-tenant SaaS with Next.js, Supabase, Stripe, and OpenAI.
+# Vibe-Vuln-Bench — AI App Builder Security Benchmark
 
-Maintained by **[Shipmate](https://shipmate.agency)**.
+[![Shipmate](https://img.shields.io/badge/Shipmate-shipmate.agency-1E57A8?style=flat-square)](https://shipmate.agency)
+[![Checks](https://img.shields.io/badge/Baseline-10_Security_Checks-11141C?style=flat-square)](./grade_app.py)
+[![License: MIT](https://img.shields.io/badge/License-MIT-11141C?style=flat-square)](./LICENSE)
 
-## What It Checks (10-Point Baseline)
-1. Supabase tables enable Row Level Security (`ENABLE ROW LEVEL SECURITY`)
-2. No `USING (true)` / `WITH CHECK (true)` write policies
-3. No `service_role` key referenced in client code or public env vars
-4. No secrets in `NEXT_PUBLIC_*` / `VITE_*` variables
-5. No hardcoded live Stripe, OpenAI, Anthropic, or Supabase secret keys
-6. `.env` files ignored in `.gitignore`
-7. Stripe webhook verifies `stripe-signature` via `constructEvent`
-8. AI `/api/chat` route verifies authentication
-9. AI route enforces `max_tokens` / `max_output_tokens` or rate limiting
-10. Security headers (`CSP`, `HSTS`, `nosniff`) configured
+**Vibe-Vuln-Bench** is an open, reproducible benchmark prompt and zero-dependency 10-check security grader maintained by **[Shipmate](https://shipmate.agency)** to compare what AI app builders (**Lovable, Bolt, Cursor, v0, Replit**) ship by default when asked to build a real multi-tenant SaaS with **Next.js, Supabase, Stripe, and OpenAI**.
 
-> Note: Automated checks only catch the baseline. Pair this scorecard with a [two-account live IDOR test](https://shipmate.agency/articles/supabase-rls-two-account-test) before publishing results.
+## The 10-Point Baseline Rubric
+| # | Check | Why It Matters |
+|---:|---|---|
+| 1 | Supabase tables enable RLS | Prevents anonymous data dumps via public `anon` key |
+| 2 | No `USING (true)` write policies | Prevents any user from overwriting other tenants' rows |
+| 3 | No `service_role` in client code | Admin key bypasses all Postgres RLS |
+| 4 | No secrets in `NEXT_PUBLIC_*` / `VITE_*` | Public env prefixes compile into browser bundles |
+| 5 | No hardcoded live API keys | Prevents credential theft from Git history |
+| 6 | `.env` excluded in `.gitignore` | Stops accidental secret commits |
+| 7 | Stripe webhook calls `constructEvent` | Blocks forged `checkout.session.completed` free upgrades |
+| 8 | AI `/api/chat` checks authentication | Stops anonymous abuse of your LLM API key |
+| 9 | AI route caps `max_tokens` or rate limit | Prevents Denial-of-Wallet API bills |
+| 10 | Security headers configured | Baseline CSP, HSTS, and `nosniff` defense |
 
-## Quick Start
-1. Paste [`PROMPT.md`](./PROMPT.md) verbatim into each builder and export the repos into `submissions/<builder>/`.
-2. Run the zero-dependency Python 3 grader:
+> Static checks only establish the floor. Always follow with a manual [two-account Supabase RLS isolation test](https://shipmate.agency/articles/supabase-rls-two-account-test) before publishing live results.
 
+## Usage
 ```bash
+# Paste PROMPT.md verbatim into each builder, export repos to submissions/<builder>/, then run:
 python3 grade_app.py submissions/ --md scorecard.md --json scorecard.json
-```
 
-3. Run self-tests:
-
-```bash
+# Run self-tests
 python3 -m unittest test_grade_app.py -v
 ```
+
+Part of **[Shipmate Open Source](https://github.com/Shipmate-agency)** · Free check: https://shipmate.agency/check · Lockdown ($950) & Pentest + Letter ($2,950): https://shipmate.agency
