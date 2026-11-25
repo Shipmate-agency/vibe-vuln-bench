@@ -67,6 +67,11 @@ LIVE_KEY = "sk" + "_live_" + "1234567890abcdef1234"
 
 
 class TestCheckAccuracy(unittest.TestCase):
+    def test_public_secret_with_suffix(self) -> None:
+        for name in ("NEXT_PUBLIC_STRIPE_SECRET_KEY", "VITE_SUPABASE_SERVICE_ROLE_KEY"):
+            self.assertFalse(checks_for({"a.ts": f"process.env.{name}\n"})["no_public_secret_env"], name)
+        self.assertTrue(checks_for({"a.ts": "process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY\n"})["no_public_secret_env"])
+
     def test_open_write_policy_per_statement(self) -> None:
         own_then_read = ('create policy "own" on t for update using (auth.uid() = id);\n'
                          'create policy "read" on t for select using (true);\n')
