@@ -74,6 +74,16 @@ def fake_jwt(role: str) -> str:
 
 
 class TestCheckAccuracy(unittest.TestCase):
+    def test_ai_route_auth_and_cap(self) -> None:
+        sdk = ("const { userId } = await auth(); if (!userId) return new Response('no', {status: 401});\n"
+               "return streamText({ model: openai('gpt-5'), maxOutputTokens: 400 })\n")
+        c = checks_for({"app/api/chat/route.ts": sdk})
+        self.assertTrue(c["ai_route_auth"])
+        self.assertTrue(c["ai_token_or_rate_cap"])
+        c = checks_for({"app/api/chat/route.ts": "return openai.chat.completions.create({})\n"})
+        self.assertFalse(c["ai_route_auth"])
+        self.assertFalse(c["ai_token_or_rate_cap"])
+
     def test_stripe_webhook_handlers_only(self) -> None:
         verified = {"app/api/webhooks/stripe/route.ts": "stripe.webhooks.constructEvent(body, sig, secret)\n"}
         self.assertTrue(checks_for({**verified, "m/003_stripe_webhook_events.sql": "create table x (id text);\n"})["stripe_sig_verified"])

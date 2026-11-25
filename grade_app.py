@@ -42,8 +42,8 @@ PUBLIC_SECRET_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*(?:SEC
 PUBLIC_SERVICE_ROLE_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*SERVICE_ROLE", re.I)
 JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+")
 HARDCODED_KEY_RE =re.compile(r"\b(?:sk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sk-(?:proj|ant-api\d{2})-[A-Za-z0-9_-]{20,})\b")
-AUTH_HINT_RE = re.compile(r"\b(getUser|getSession|auth\(\)|requireUser|currentUser|verifyToken)\b")
-AI_CAP_RE = re.compile(r"\b(max_tokens|max_output_tokens|maxCompletionTokens|ratelimit|rateLimit)\b", re.I)
+AUTH_HINT_RE = re.compile(r"\b(?:getUser|getSession|requireUser|currentUser|verifyToken)\b|\bauth\(\)")
+AI_CAP_RE = re.compile(r"\b(max_tokens|max_output_tokens|maxCompletionTokens|maxOutputTokens|maxTokens|ratelimit|rateLimit)\b", re.I)
 HEADER_HINT_RE = re.compile(r"(Content-Security-Policy|Strict-Transport-Security|X-Content-Type-Options)", re.I)
 
 
