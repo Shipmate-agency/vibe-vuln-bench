@@ -67,6 +67,13 @@ LIVE_KEY = "sk" + "_live_" + "1234567890abcdef1234"
 
 
 class TestCheckAccuracy(unittest.TestCase):
+    def test_rls_quoting_and_if_exists(self) -> None:
+        sql = ('create table "public"."workspaces" (id uuid);\ncreate table public.invoices (id uuid);\n'
+               "alter table if exists public.workspaces enable row level security;\n"
+               'alter table "public"."invoices" enable row level security;\n')
+        self.assertTrue(checks_for({"m/001.sql": sql})["rls_enabled"])
+        self.assertFalse(checks_for({"m/001.sql": "create table public.invoices (id uuid);\n"})["rls_enabled"])
+
     def test_env_files_and_gitignore(self) -> None:
         # .env.example is committed, so its keys count; a gitignored .env.local is fine.
         self.assertFalse(checks_for({".env.example": f"STRIPE_SECRET_KEY={LIVE_KEY}\n"})["no_hardcoded_keys"])

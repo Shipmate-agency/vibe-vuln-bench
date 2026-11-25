@@ -32,7 +32,7 @@ CHECKS = [
 ]
 
 CREATE_TABLE_RE = re.compile(r"create\s+table\s+(?:if\s+not\s+exists\s+)?([a-zA-Z0-9_.\"`]+)", re.I)
-ENABLE_RLS_RE = re.compile(r"alter\s+table\s+(?:only\s+)?([a-zA-Z0-9_.\"`]+)\s+enable\s+row\s+level\s+security", re.I)
+ENABLE_RLS_RE = re.compile(r"alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?([a-zA-Z0-9_.\"`]+)\s+enable\s+row\s+level\s+security", re.I)
 OPEN_WRITE_RE = re.compile(r"create\s+policy[\s\S]{0,260}?\bfor\s+(?:all|insert|update|delete)\b[\s\S]{0,260}?(?:using|with\s+check)\s*\(\s*true\s*\)", re.I)
 PUBLIC_SECRET_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*(?:SECRET|SERVICE_ROLE|PRIVATE_KEY|OPENAI_API_KEY|STRIPE_SECRET)\b", re.I)
 HARDCODED_KEY_RE = re.compile(r"\b(?:sk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sk-(?:proj|ant-api\d{2})-[A-Za-z0-9_-]{20,})\b")
@@ -84,8 +84,11 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
     root_env_files = [rel for rel, _ in files if "/" not in rel and rel.startswith(".env")
                       and not rel.endswith((".example", ".sample", ".template"))]
 
-    created = {m.group(1).strip('"`').lower().split(".")[-1] for m in CREATE_TABLE_RE.finditer(sql_text)}
-    rls_on = {m.group(1).strip('"`').lower().split(".")[-1] for m in ENABLE_RLS_RE.finditer(sql_text)}
+    def table(m: re.Match[str]) -> str:  # "public"."x" -> x
+        return re.sub(r'["`]', "", m.group(1)).lower().split(".")[-1]
+
+    created = {table(m) for m in CREATE_TABLE_RE.finditer(sql_text)}
+    rls_on = {table(m) for m in ENABLE_RLS_RE.finditer(sql_text)}
     rls_enabled = bool(created) and created.issubset(rls_on)
 
     no_open_write = not bool(OPEN_WRITE_RE.search(sql_text))
