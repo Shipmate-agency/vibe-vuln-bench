@@ -74,6 +74,12 @@ def fake_jwt(role: str) -> str:
 
 
 class TestCheckAccuracy(unittest.TestCase):
+    def test_stripe_webhook_handlers_only(self) -> None:
+        verified = {"app/api/webhooks/stripe/route.ts": "stripe.webhooks.constructEvent(body, sig, secret)\n"}
+        self.assertTrue(checks_for({**verified, "m/003_stripe_webhook_events.sql": "create table x (id text);\n"})["stripe_sig_verified"])
+        self.assertTrue(checks_for({"api/stripe_webhook.py": "stripe.Webhook.construct_event(p, s, k)\n"})["stripe_sig_verified"])
+        self.assertFalse(checks_for({"app/api/webhooks/stripe/route.ts": "await req.json()\n"})["stripe_sig_verified"])
+
     def test_service_role(self) -> None:
         admin = "import 'server-only'\ncreateClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)\n"
         self.assertTrue(checks_for({"lib/admin.ts": admin})["no_service_role_client"])

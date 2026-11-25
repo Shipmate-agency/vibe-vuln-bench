@@ -18,6 +18,7 @@ from pathlib import Path
 
 SKIP_DIRS = {".git", "node_modules", ".next", "dist", "build", ".venv", "venv", "__pycache__"}
 CODE_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".sql", ".json", ".env", ".toml", ".yaml", ".yml"}
+HANDLER_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py"}
 
 CHECKS = [
     ("rls_enabled", "Supabase tables enable RLS"),
@@ -118,8 +119,12 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
     no_hardcoded = not bool(HARDCODED_KEY_RE.search(committed_text))
     env_gitignored = all(gitignored(rel) for rel in root_env_files)
 
-    webhook_files = [txt for rel, txt in files if "webhook" in rel.lower() and "stripe" in (rel.lower() + txt.lower())]
-    stripe_sig_verified = bool(webhook_files) and all("constructEvent" in txt for txt in webhook_files)
+    # Handler code only: a migration such as stripe_webhook_events.sql is not a handler.
+    webhook_files = [txt for rel, txt in files if "webhook" in rel.lower() and Path(rel).suffix in HANDLER_EXTS
+                     and "stripe" in (rel.lower() + txt.lower())]
+    stripe_sig_verified = bool(webhook_files) and all(
+        "constructEvent" in txt or "construct_event" in txt for txt in webhook_files
+    )
 
     chat_files = [txt for rel, txt in files if "chat" in rel.lower() and ("openai" in txt.lower() or "anthropic" in txt.lower() or "api/" in rel.lower())]
     ai_route_auth = bool(chat_files) and all(bool(AUTH_HINT_RE.search(txt)) for txt in chat_files)
