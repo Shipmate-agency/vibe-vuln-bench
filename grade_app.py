@@ -8,6 +8,7 @@ across 10 concrete checks and outputs a clean Markdown/JSON scorecard.
 from __future__ import annotations
 
 import argparse
+import base64
 import fnmatch
 import json
 import os
@@ -37,7 +38,9 @@ POLICY_RE = re.compile(r"create\s+policy[^;]*", re.I)  # one statement, so check
 FOR_SELECT_RE = re.compile(r"\bfor\s+select\b", re.I)  # no FOR clause means FOR ALL
 ALLOW_ALL_RE = re.compile(r"\b(?:using|with\s+check)\s*\(\s*true\s*\)", re.I)
 PUBLIC_SECRET_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*(?:SECRET|SERVICE_ROLE|PRIVATE_KEY|OPENAI_API_KEY|STRIPE_SECRET)[A-Z0-9_]*\b", re.I)
-HARDCODED_KEY_RE = re.compile(r"\b(?:sk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sk-(?:proj|ant-api\d{2})-[A-Za-z0-9_-]{20,})\b")
+PUBLIC_SERVICE_ROLE_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*SERVICE_ROLE", re.I)
+JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+")
+HARDCODED_KEY_RE =re.compile(r"\b(?:sk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sk-(?:proj|ant-api\d{2})-[A-Za-z0-9_-]{20,})\b")
 AUTH_HINT_RE = re.compile(r"\b(getUser|getSession|auth\(\)|requireUser|currentUser|verifyToken)\b")
 AI_CAP_RE = re.compile(r"\b(max_tokens|max_output_tokens|maxCompletionTokens|ratelimit|rateLimit)\b", re.I)
 HEADER_HINT_RE = re.compile(r"(Content-Security-Policy|Strict-Transport-Security|X-Content-Type-Options)", re.I)
@@ -49,6 +52,14 @@ class RepoScore:
     passed: int
     total: int
     checks: dict[str, bool]
+
+
+def _jwt_role(token: str) -> str | None:
+    try:
+        payload = token.split(".")[1]
+        return json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))).get("role")
+    except (ValueError, AttributeError):
+        return None
 
 
 def _read_files(root: Path) -> list[tuple[str, str]]:
@@ -82,7 +93,8 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
         return any(fnmatch.fnmatch(Path(rel).name, p) or fnmatch.fnmatch(rel, p) for p in ignore_patterns)
 
     # Secrets in a gitignored .env are where they belong; only committed files count for leaked keys.
-    committed_text = "\n".join(txt for rel, txt in files if not (Path(rel).name.startswith(".env") and gitignored(rel)))
+    committed_files = [(rel, txt) for rel, txt in files if not (Path(rel).name.startswith(".env") and gitignored(rel))]
+    committed_text = "\n".join(txt for _, txt in committed_files)
     root_env_files = [rel for rel, _ in files if "/" not in rel and rel.startswith(".env")
                       and not rel.endswith((".example", ".sample", ".template"))]
 
@@ -96,9 +108,11 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
     no_open_write = not any(
         not FOR_SELECT_RE.search(m.group(0)) and ALLOW_ALL_RE.search(m.group(0)) for m in POLICY_RE.finditer(sql_text)
     )
+    # The standard server admin client reads NEXT_PUBLIC_SUPABASE_URL next to SUPABASE_SERVICE_ROLE_KEY, so that alone is fine.
     no_service_role_client = not any(
-        "service_role" in txt.lower() and ("next_public" in txt.lower() or "vite_" in txt.lower() or "use client" in txt.lower())
-        for _, txt in files
+        ("service_role" in txt.lower() and ("use client" in txt.lower() or PUBLIC_SERVICE_ROLE_RE.search(txt)))
+        or any(_jwt_role(m.group(0)) == "service_role" for m in JWT_RE.finditer(txt))
+        for _, txt in committed_files
     )
     no_public_secret = not bool(PUBLIC_SECRET_RE.search(all_text))
     no_hardcoded = not bool(HARDCODED_KEY_RE.search(committed_text))

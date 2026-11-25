@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import sys
 import tempfile
 import unittest
@@ -66,7 +68,19 @@ def checks_for(files: dict[str, str]) -> dict[str, bool]:
 LIVE_KEY = "sk" + "_live_" + "1234567890abcdef1234"
 
 
+def fake_jwt(role: str) -> str:
+    enc = lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).decode().rstrip("=")  # noqa: E731
+    return enc({"alg": "HS256"}) + "." + enc({"iss": "supabase", "role": role}) + ".c2lnbmF0dXJl"
+
+
 class TestCheckAccuracy(unittest.TestCase):
+    def test_service_role(self) -> None:
+        admin = "import 'server-only'\ncreateClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)\n"
+        self.assertTrue(checks_for({"lib/admin.ts": admin})["no_service_role_client"])
+        self.assertTrue(checks_for({"lib/sb.ts": f"createClient(url, '{fake_jwt('anon')}')\n"})["no_service_role_client"])
+        self.assertFalse(checks_for({"lib/sb.ts": f"createClient(url, '{fake_jwt('service_role')}')\n"})["no_service_role_client"])
+        self.assertFalse(checks_for({"a.tsx": "'use client'\nconst k = process.env.SUPABASE_SERVICE_ROLE_KEY\n"})["no_service_role_client"])
+
     def test_public_secret_with_suffix(self) -> None:
         for name in ("NEXT_PUBLIC_STRIPE_SECRET_KEY", "VITE_SUPABASE_SERVICE_ROLE_KEY"):
             self.assertFalse(checks_for({"a.ts": f"process.env.{name}\n"})["no_public_secret_env"], name)
