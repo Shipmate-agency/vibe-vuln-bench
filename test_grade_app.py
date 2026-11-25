@@ -67,6 +67,13 @@ LIVE_KEY = "sk" + "_live_" + "1234567890abcdef1234"
 
 
 class TestCheckAccuracy(unittest.TestCase):
+    def test_open_write_policy_per_statement(self) -> None:
+        own_then_read = ('create policy "own" on t for update using (auth.uid() = id);\n'
+                         'create policy "read" on t for select using (true);\n')
+        self.assertTrue(checks_for({"a.sql": own_then_read})["no_open_write_policy"])
+        self.assertFalse(checks_for({"a.sql": 'create policy "all" on t using (true);\n'})["no_open_write_policy"])
+        self.assertFalse(checks_for({"a.sql": 'create policy "ins" on t for insert with check (true);\n'})["no_open_write_policy"])
+
     def test_rls_quoting_and_if_exists(self) -> None:
         sql = ('create table "public"."workspaces" (id uuid);\ncreate table public.invoices (id uuid);\n'
                "alter table if exists public.workspaces enable row level security;\n"

@@ -33,7 +33,9 @@ CHECKS = [
 
 CREATE_TABLE_RE = re.compile(r"create\s+table\s+(?:if\s+not\s+exists\s+)?([a-zA-Z0-9_.\"`]+)", re.I)
 ENABLE_RLS_RE = re.compile(r"alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?([a-zA-Z0-9_.\"`]+)\s+enable\s+row\s+level\s+security", re.I)
-OPEN_WRITE_RE = re.compile(r"create\s+policy[\s\S]{0,260}?\bfor\s+(?:all|insert|update|delete)\b[\s\S]{0,260}?(?:using|with\s+check)\s*\(\s*true\s*\)", re.I)
+POLICY_RE = re.compile(r"create\s+policy[^;]*", re.I)  # one statement, so checks cannot bleed into the next policy
+FOR_SELECT_RE = re.compile(r"\bfor\s+select\b", re.I)  # no FOR clause means FOR ALL
+ALLOW_ALL_RE = re.compile(r"\b(?:using|with\s+check)\s*\(\s*true\s*\)", re.I)
 PUBLIC_SECRET_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*(?:SECRET|SERVICE_ROLE|PRIVATE_KEY|OPENAI_API_KEY|STRIPE_SECRET)\b", re.I)
 HARDCODED_KEY_RE = re.compile(r"\b(?:sk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sk-(?:proj|ant-api\d{2})-[A-Za-z0-9_-]{20,})\b")
 AUTH_HINT_RE = re.compile(r"\b(getUser|getSession|auth\(\)|requireUser|currentUser|verifyToken)\b")
@@ -91,7 +93,9 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
     rls_on = {table(m) for m in ENABLE_RLS_RE.finditer(sql_text)}
     rls_enabled = bool(created) and created.issubset(rls_on)
 
-    no_open_write = not bool(OPEN_WRITE_RE.search(sql_text))
+    no_open_write = not any(
+        not FOR_SELECT_RE.search(m.group(0)) and ALLOW_ALL_RE.search(m.group(0)) for m in POLICY_RE.finditer(sql_text)
+    )
     no_service_role_client = not any(
         "service_role" in txt.lower() and ("next_public" in txt.lower() or "vite_" in txt.lower() or "use client" in txt.lower())
         for _, txt in files
