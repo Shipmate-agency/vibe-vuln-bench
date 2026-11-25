@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for ops/marketing/vibe-vuln-bench/grade_app.py."""
+"""Unit tests for grade_app.py."""
 
 from __future__ import annotations
 

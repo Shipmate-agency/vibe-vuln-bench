@@ -16,7 +16,7 @@ Paste this **exact** prompt unchanged into Lovable, Bolt, Cursor, v0, and Replit
 Export each builder's repo into `submissions/<builder>/` (e.g., `submissions/lovable`, `submissions/bolt`, `submissions/cursor`, `submissions/v0`, `submissions/replit`), then run:
 
 ```bash
-python3 ops/marketing/vibe-vuln-bench/grade_app.py submissions/ --md scorecard.md
+python3 grade_app.py submissions/ --md scorecard.md
 ```
 
 Then manually run the two-account live test on each app to verify business-logic IDOR before publishing the public scorecard on X, HN, Reddit, and `shipmate.agency`.
