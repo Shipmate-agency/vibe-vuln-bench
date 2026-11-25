@@ -54,5 +54,28 @@ class TestVibeVulnBench(unittest.TestCase):
             self.assertIn("**10/10**", md)
 
 
+def checks_for(files: dict[str, str]) -> dict[str, bool]:
+    with tempfile.TemporaryDirectory() as td:
+        for rel, text in files.items():
+            p = Path(td) / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+        return ga.grade_repo(Path(td)).checks
+
+
+LIVE_KEY = "sk" + "_live_" + "1234567890abcdef1234"
+
+
+class TestCheckAccuracy(unittest.TestCase):
+    def test_env_files_and_gitignore(self) -> None:
+        # .env.example is committed, so its keys count; a gitignored .env.local is fine.
+        self.assertFalse(checks_for({".env.example": f"STRIPE_SECRET_KEY={LIVE_KEY}\n"})["no_hardcoded_keys"])
+        ok = checks_for({".env.local": f"STRIPE_SECRET_KEY={LIVE_KEY}\n", ".env": "A=1\n", ".gitignore": ".env\n.env*.local\n"})
+        self.assertTrue(ok["no_hardcoded_keys"])
+        self.assertTrue(ok["env_gitignored"])
+        # ".env.example" in .gitignore does not ignore .env
+        self.assertFalse(checks_for({".env": "A=1\n", ".gitignore": ".env.example\n"})["env_gitignored"])
+
+
 if __name__ == "__main__":
     unittest.main()

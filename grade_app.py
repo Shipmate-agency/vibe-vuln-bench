@@ -8,6 +8,7 @@ across 10 concrete checks and outputs a clean Markdown/JSON scorecard.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -56,7 +57,7 @@ def _read_files(root: Path) -> list[tuple[str, str]]:
             p = Path(dirpath) / fname
             if p.is_symlink():
                 continue
-            if p.suffix.lower() not in CODE_EXTS and fname not in {".env", ".gitignore", "next.config.js", "next.config.mjs", "next.config.ts", "vercel.json"}:
+            if p.suffix.lower() not in CODE_EXTS and not fname.startswith(".env") and fname not in {".gitignore", "next.config.js", "next.config.mjs", "next.config.ts", "vercel.json"}:
                 continue
             try:
                 if p.stat().st_size > 512_000:
@@ -72,6 +73,16 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
     sql_text = "\n".join(txt for rel, txt in files if rel.endswith(".sql"))
     all_text = "\n".join(txt for _, txt in files)
     gitignore = next((txt for rel, txt in files if rel == ".gitignore"), "")
+    # shortcut: root .gitignore only, negations ignored.
+    ignore_patterns = [p.strip().lstrip("/") for p in gitignore.splitlines() if p.strip() and p.strip()[0] not in "#!"]
+
+    def gitignored(rel: str) -> bool:
+        return any(fnmatch.fnmatch(Path(rel).name, p) or fnmatch.fnmatch(rel, p) for p in ignore_patterns)
+
+    # Secrets in a gitignored .env are where they belong; only committed files count for leaked keys.
+    committed_text = "\n".join(txt for rel, txt in files if not (Path(rel).name.startswith(".env") and gitignored(rel)))
+    root_env_files = [rel for rel, _ in files if "/" not in rel and rel.startswith(".env")
+                      and not rel.endswith((".example", ".sample", ".template"))]
 
     created = {m.group(1).strip('"`').lower().split(".")[-1] for m in CREATE_TABLE_RE.finditer(sql_text)}
     rls_on = {m.group(1).strip('"`').lower().split(".")[-1] for m in ENABLE_RLS_RE.finditer(sql_text)}
@@ -83,8 +94,8 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
         for _, txt in files
     )
     no_public_secret = not bool(PUBLIC_SECRET_RE.search(all_text))
-    no_hardcoded = not bool(HARDCODED_KEY_RE.search(all_text))
-    env_gitignored = (".env" in gitignore) or not (root / ".env").is_file()
+    no_hardcoded = not bool(HARDCODED_KEY_RE.search(committed_text))
+    env_gitignored = all(gitignored(rel) for rel in root_env_files)
 
     webhook_files = [txt for rel, txt in files if "webhook" in rel.lower() and "stripe" in (rel.lower() + txt.lower())]
     stripe_sig_verified = bool(webhook_files) and all("constructEvent" in txt for txt in webhook_files)
