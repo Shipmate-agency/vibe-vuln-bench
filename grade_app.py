@@ -38,6 +38,8 @@ ENABLE_RLS_RE = re.compile(r"alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?([a-
 POLICY_RE = re.compile(r"create\s+policy[^;]*", re.I)  # one statement, so checks cannot bleed into the next policy
 FOR_SELECT_RE = re.compile(r"\bfor\s+select\b", re.I)  # no FOR clause means FOR ALL
 ALLOW_ALL_RE = re.compile(r"\b(?:using|with\s+check)\s*\(\s*true\s*\)", re.I)
+# service_role bypasses RLS anyway, so a policy granted only TO service_role opens nothing
+SERVICE_ROLE_ONLY_RE = re.compile(r"\bto\s+service_role\b(?!\s*,)", re.I)
 PUBLIC_SECRET_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*(?:SECRET|SERVICE_ROLE|PRIVATE_KEY|OPENAI_API_KEY|STRIPE_SECRET)[A-Z0-9_]*\b", re.I)
 PUBLIC_SERVICE_ROLE_RE = re.compile(r"\b(?:NEXT_PUBLIC_|VITE_|PUBLIC_)[A-Z0-9_]*SERVICE_ROLE", re.I)
 JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+")
@@ -107,7 +109,8 @@ def grade_repo(root: Path, name: str | None = None) -> RepoScore:
     rls_enabled = bool(created) and created.issubset(rls_on)
 
     no_open_write = not any(
-        not FOR_SELECT_RE.search(m.group(0)) and ALLOW_ALL_RE.search(m.group(0)) for m in POLICY_RE.finditer(sql_text)
+        not FOR_SELECT_RE.search(m.group(0)) and ALLOW_ALL_RE.search(m.group(0)) and not SERVICE_ROLE_ONLY_RE.search(m.group(0))
+        for m in POLICY_RE.finditer(sql_text)
     )
     # The standard server admin client reads NEXT_PUBLIC_SUPABASE_URL next to SUPABASE_SERVICE_ROLE_KEY, so that alone is fine.
     no_service_role_client = not any(

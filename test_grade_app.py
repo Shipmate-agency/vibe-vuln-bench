@@ -111,6 +111,8 @@ class TestCheckAccuracy(unittest.TestCase):
         self.assertTrue(checks_for({"a.sql": own_then_read})["no_open_write_policy"])
         self.assertFalse(checks_for({"a.sql": 'create policy "all" on t using (true);\n'})["no_open_write_policy"])
         self.assertFalse(checks_for({"a.sql": 'create policy "ins" on t for insert with check (true);\n'})["no_open_write_policy"])
+        self.assertTrue(checks_for({"a.sql": 'create policy "svc" on t for all to service_role using (true);\n'})["no_open_write_policy"])
+        self.assertFalse(checks_for({"a.sql": 'create policy "svc" on t to service_role, anon using (true);\n'})["no_open_write_policy"])
 
     def test_rls_quoting_and_if_exists(self) -> None:
         sql = ('create table "public"."workspaces" (id uuid);\ncreate table public.invoices (id uuid);\n'
