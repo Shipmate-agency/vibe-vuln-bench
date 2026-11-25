@@ -71,7 +71,7 @@ def _read_files(root: Path) -> list[tuple[str, str]]:
             p = Path(dirpath) / fname
             if p.is_symlink():
                 continue
-            if p.suffix.lower() not in CODE_EXTS and not fname.startswith(".env") and fname not in {".gitignore", "next.config.js", "next.config.mjs", "next.config.ts", "vercel.json"}:
+            if p.suffix.lower() not in CODE_EXTS and not fname.startswith(".env") and fname not in {".gitignore", "_headers", "next.config.js", "next.config.mjs", "next.config.ts", "vercel.json"}:
                 continue
             try:
                 if p.stat().st_size > 512_000:

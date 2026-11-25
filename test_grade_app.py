@@ -74,6 +74,9 @@ def fake_jwt(role: str) -> str:
 
 
 class TestCheckAccuracy(unittest.TestCase):
+    def test_headers_file(self) -> None:
+        self.assertTrue(checks_for({"public/_headers": "/*\n  X-Content-Type-Options: nosniff\n"})["security_headers_cfg"])
+
     def test_ai_route_auth_and_cap(self) -> None:
         sdk = ("const { userId } = await auth(); if (!userId) return new Response('no', {status: 401});\n"
                "return streamText({ model: openai('gpt-5'), maxOutputTokens: 400 })\n")
